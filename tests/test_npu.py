@@ -235,6 +235,44 @@ class DataLoaderTest(unittest.TestCase):
                 load_json(no_filters)
 
 
+DATA_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data.json")
+
+
+@unittest.skipUnless(os.path.exists(DATA_PATH), "data.json 없음")
+class OfficialDataTest(unittest.TestCase):
+    """미션 제공 data.json으로 README 결과 리포트의 숫자를 재현한다."""
+
+    def setUp(self):
+        data = load_json(DATA_PATH)
+        self.filters, self.logs = load_filters(data)
+        self.results = {r.case_id: r for r in analyze_patterns(data, self.filters)}
+
+    def test_all_filters_loaded(self):
+        self.assertEqual(sorted(self.filters), [5, 13, 25])
+        self.assertTrue(all(log.ok for log in self.logs))
+
+    def test_summary(self):
+        passed = sorted(k for k, r in self.results.items() if r.passed)
+        failed = sorted(k for k, r in self.results.items() if not r.passed)
+        self.assertEqual(passed, ["size_13_1", "size_25_2", "size_5_2"])
+        self.assertEqual(failed, ["size_13_2", "size_25_1", "size_5_1"])
+        for k in failed:
+            self.assertEqual(self.results[k].decision, "UNDECIDED")
+
+    def test_ties_are_float_noise_only(self):
+        # 실패 3건은 실제로는 같은 값이고 차이는 누적 오차(1e-14 미만)뿐이다.
+        for k in ("size_5_1", "size_13_2", "size_25_1"):
+            r = self.results[k]
+            self.assertLess(abs(r.cross_score - r.x_score), 1e-14)
+
+    def test_plain_comparison_would_mislabel(self):
+        # epsilon 없이 > 로만 비교하면 3건 모두 expected와 다른 라벨을 고른다.
+        for k in ("size_5_1", "size_13_2", "size_25_1"):
+            r = self.results[k]
+            plain = CROSS if r.cross_score > r.x_score else X
+            self.assertNotEqual(plain, r.expected, k)
+
+
 class BenchmarkTest(unittest.TestCase):
     def test_measure_positive(self):
         self.assertGreater(measure_ms(mac_2d, CROSS3, X3), 0)
