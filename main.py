@@ -88,7 +88,7 @@ def run_user_mode():
     print(f"연산 시간(평균/{benchmark.REPEAT}회): {elapsed:.4f} ms")
     winner = decide(score_a, score_b)
     if winner is None:
-        print(f"판정: 판정 불가 (|A-B| < {EPSILON:g})")
+        print(f"판정: 판정 불가 (|A-B| < {EPSILON:g})".replace("e-0", "e-"))
     else:
         print(f"판정: {winner}")
 
